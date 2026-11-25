@@ -11,7 +11,8 @@ import {
 import type { IncidentRow, MonitorRow, ProbeResult } from './types';
 
 const PORT = Number(process.env.PORT ?? 8095);
-const PROBE_INTERVAL_MS = 10_000;
+const HOST = process.env.HOST ?? '0.0.0.0';
+const PROBE_INTERVAL_MS = Number(process.env.PROBE_INTERVAL_MS ?? 10_000);
 
 async function bootstrap(): Promise<void> {
   await initDatabase();
@@ -318,9 +319,9 @@ async function bootstrap(): Promise<void> {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
-  server.listen(PORT, () => {
+  server.listen(PORT, HOST, () => {
     console.log(
-      `[OpsPulse] Probe Engine listening on http://localhost:${PORT} (WS: ws://localhost:${PORT}/ws)`,
+      `[OpsPulse] Probe Engine listening on http://${HOST}:${PORT} (WS: ws://${HOST}:${PORT}/ws)`,
     );
     // Run initial probe shortly after listen so self-check /api/health succeeds
     setTimeout(() => {

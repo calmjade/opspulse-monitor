@@ -9,6 +9,9 @@ import type {
 
 export type WsConnectionState = 'connecting' | 'connected' | 'disconnected';
 
+const BASE_PREFIX = import.meta.env.BASE_URL.replace(/\/$/, '');
+const API_BASE = `${BASE_PREFIX}/api`;
+
 interface CreateMonitorInput {
   name: string;
   url: string;
@@ -73,7 +76,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
 
   fetchDashboard: async () => {
     try {
-      const res = await fetch('/api/dashboard');
+      const res = await fetch(`${API_BASE}/dashboard`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -110,7 +113,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
       if (disposed) return;
       set({ wsStatus: 'connecting' });
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}${BASE_PREFIX}/ws`;
       socket = new WebSocket(wsUrl);
 
       socket.onopen = () => {
@@ -160,7 +163,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
   runAllProbes: async () => {
     set({ probingAll: true, errorMsg: null });
     try {
-      const res = await fetch('/api/probes/run-all', { method: 'POST' });
+      const res = await fetch(`${API_BASE}/probes/run-all`, { method: 'POST' });
       if (!res.ok) {
         throw new Error(`全量拨测失败 (HTTP ${res.status})`);
       }
@@ -180,7 +183,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
       errorMsg: null,
     }));
     try {
-      const res = await fetch(`/api/monitors/${id}/probe`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/monitors/${id}/probe`, { method: 'POST' });
       if (!res.ok) {
         throw new Error(`单点拨测失败 (HTTP ${res.status})`);
       }
@@ -201,7 +204,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
   createMonitor: async (input) => {
     set({ errorMsg: null });
     try {
-      const res = await fetch('/api/monitors', {
+      const res = await fetch(`${API_BASE}/monitors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -223,7 +226,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
 
   toggleMonitor: async (id, enabled) => {
     try {
-      const res = await fetch(`/api/monitors/${id}`, {
+      const res = await fetch(`${API_BASE}/monitors/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
@@ -241,7 +244,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
 
   updateThreshold: async (id, thresholdMs) => {
     try {
-      const res = await fetch(`/api/monitors/${id}`, {
+      const res = await fetch(`${API_BASE}/monitors/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ thresholdMs }),
@@ -259,7 +262,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
 
   deleteMonitor: async (id) => {
     try {
-      const res = await fetch(`/api/monitors/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/monitors/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         throw new Error('删除监控节点失败');
       }
@@ -273,7 +276,7 @@ export const useOpsStore = create<OpsState>((set, get) => ({
 
   ackIncident: async (id) => {
     try {
-      const res = await fetch(`/api/incidents/${id}/ack`, { method: 'PATCH' });
+      const res = await fetch(`${API_BASE}/incidents/${id}/ack`, { method: 'PATCH' });
       if (!res.ok) {
         throw new Error('确认告警事件失败');
       }

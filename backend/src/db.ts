@@ -55,6 +55,51 @@ const SEED_MONITORS: SeedMonitor[] = [
   },
 ];
 
+const PROD_SEED_MONITORS: SeedMonitor[] = [
+  {
+    name: '个人主页与作品集 (calmjade.cn)',
+    url: 'https://calmjade.cn/',
+    groupName: '展示门户',
+    thresholdMs: 1500,
+  },
+  {
+    name: '油养记生产站 (fuelcare.cloud)',
+    url: 'https://fuelcare.cloud/',
+    groupName: '核心产品',
+    thresholdMs: 1500,
+  },
+  {
+    name: '数据驿站 Lite API (Spring Boot)',
+    url: 'http://127.0.0.1:8091/api/health',
+    groupName: 'Java 微服务',
+    thresholdMs: 800,
+  },
+  {
+    name: '星枢研发舱 API (Fastify)',
+    url: 'http://127.0.0.1:8092/api/health',
+    groupName: 'Node 微服务',
+    thresholdMs: 500,
+  },
+  {
+    name: '智问数舱 API (Hono SSE)',
+    url: 'http://127.0.0.1:8093/api/health',
+    groupName: 'AI 引擎',
+    thresholdMs: 500,
+  },
+  {
+    name: '易采协同台全栈 (Next.js)',
+    url: 'http://127.0.0.1:9024/supplyflow/api/health',
+    groupName: '全栈 BFF',
+    thresholdMs: 1000,
+  },
+  {
+    name: '脉搏智维核心节点 (Express WS)',
+    url: 'http://127.0.0.1:8095/api/health',
+    groupName: '监控引擎',
+    thresholdMs: 300,
+  },
+];
+
 export async function initDatabase(): Promise<Database> {
   if (dbInstance) return dbInstance;
 
@@ -111,8 +156,10 @@ export async function initDatabase(): Promise<Database> {
       ON incidents(status, started_at DESC);
   `);
 
+  const activeSeeds =
+    process.env.OPSPULSE_ENV === 'production' ? PROD_SEED_MONITORS : SEED_MONITORS;
   const now = new Date().toISOString();
-  for (const seed of SEED_MONITORS) {
+  for (const seed of activeSeeds) {
     const existing = queryOne<{ id: number }>(
       'SELECT id FROM monitors WHERE url = ?',
       [seed.url],

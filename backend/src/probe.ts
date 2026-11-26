@@ -14,6 +14,34 @@ const PROBE_TIMEOUT_MS = 3000;
 const MAX_LOGS_PER_MONITOR = 100;
 const HISTORY_WINDOW = 30;
 
+function sendAlertWebhook(
+  event: 'opened' | 'resolved',
+  monitor: MonitorRow,
+  severity: 'critical' | 'warning',
+  reason: string,
+  timestamp: string,
+): void {
+  const webhookUrl = process.env.ALERT_WEBHOOK_URL?.trim();
+  if (!webhookUrl) return;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3000);
+  void fetch(webhookUrl, {
+    method: 'POST',
+    signal: controller.signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      service: 'OpsPulse',
+      event,
+      severity,
+      monitor: { id: monitor.id, name: monitor.name, url: monitor.url },
+      reason,
+      timestamp,
+    }),
+  })
+    .catch(() => undefined)
+    .finally(() => clearTimeout(timer));
+}
+
 function percentile(sortedValues: number[], p: number): number {
   if (sortedValues.length === 0) return 0;
   const idx = Math.ceil((p / 100) * sortedValues.length) - 1;
@@ -56,6 +84,7 @@ export async function probeSingleMonitor(monitor: MonitorRow): Promise<ProbeResu
   try {
     const response = await fetch(monitor.url, {
       method: 'GET',
+      redirect: 'manual',
       signal: controller.signal,
       headers: {
         'User-Agent': 'OpsPulse-Monitor/1.0',
@@ -131,6 +160,7 @@ export async function probeSingleMonitor(monitor: MonitorRow): Promise<ProbeResu
          VALUES (?, ?, ?, ?, 'open', 0, ?)`,
         [monitor.id, monitor.name, severity, reason, checkedAt],
       );
+      sendAlertWebhook('opened', monitor, severity, reason, checkedAt);
     } else if (openIncident.reason !== reason || openIncident.severity !== severity) {
       db.run(
         `UPDATE incidents SET severity = ?, reason = ?, monitor_name = ? WHERE id = ?`,
@@ -142,6 +172,7 @@ export async function probeSingleMonitor(monitor: MonitorRow): Promise<ProbeResu
       `UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE monitor_id = ? AND status = 'open'`,
       [checkedAt, monitor.id],
     );
+    sendAlertWebhook('resolved', monitor, 'warning', '服务已恢复正常', checkedAt);
   }
 
   return {

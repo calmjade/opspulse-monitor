@@ -8,7 +8,18 @@ import {
   runProbeById,
   runProbesForAllEnabled,
 } from './probe';
+import { validateMonitorTargetUrl } from './ssrf';
 import type { IncidentRow, MonitorRow, ProbeResult } from './types';
+
+const MAX_MONITORS_LIMIT = 15;
+
+function isProtectedSeedMonitor(url: string): boolean {
+  return (
+    url.startsWith('http://127.0.0.1:') ||
+    url.startsWith('https://calmjade.cn') ||
+    url.startsWith('https://fuelcare.cloud')
+  );
+}
 
 const PORT = Number(process.env.PORT ?? 8095);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -140,15 +151,29 @@ async function bootstrap(): Promise<void> {
       return;
     }
 
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        res.status(400).json({ error: '仅支持 http:// 或 https:// 协议端点' });
+    const totalRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM monitors');
+    if ((totalRow?.count ?? 0) >= MAX_MONITORS_LIMIT) {
+      res.status(400).json({ error: `监控端点数量已达上限 (${MAX_MONITORS_LIMIT})` });
+      return;
+    }
+
+    if (process.env.OPSPULSE_ENV === 'production') {
+      const check = await validateMonitorTargetUrl(url);
+      if (!check.ok) {
+        res.status(400).json({ error: check.error });
         return;
       }
-    } catch {
-      res.status(400).json({ error: '无效的 URL 格式' });
-      return;
+    } else {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          res.status(400).json({ error: '仅支持 http:// 或 https:// 协议端点' });
+          return;
+        }
+      } catch {
+        res.status(400).json({ error: '无效的 URL 格式' });
+        return;
+      }
     }
 
     const existing = queryOne<{ id: number }>('SELECT id FROM monitors WHERE url = ?', [url]);
@@ -181,7 +206,7 @@ async function bootstrap(): Promise<void> {
     });
   });
 
-  app.patch('/api/monitors/:id', (req: Request, res: Response) => {
+  app.patch('/api/monitors/:id', async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const existing = queryOne<MonitorRow>('SELECT * FROM monitors WHERE id = ?', [id]);
     if (!existing) {
@@ -196,6 +221,23 @@ async function bootstrap(): Promise<void> {
       thresholdMs?: number;
       enabled?: boolean;
     };
+
+    if (
+      process.env.OPSPULSE_ENV === 'production' &&
+      isProtectedSeedMonitor(existing.url) &&
+      (body.url !== undefined || body.enabled === false)
+    ) {
+      res.status(403).json({ error: '生产内置核心节点受保护，禁止修改地址或暂停' });
+      return;
+    }
+
+    if (body.url !== undefined && process.env.OPSPULSE_ENV === 'production') {
+      const check = await validateMonitorTargetUrl(body.url.trim());
+      if (!check.ok) {
+        res.status(400).json({ error: check.error });
+        return;
+      }
+    }
 
     const nextName = body.name !== undefined ? body.name.trim() : existing.name;
     const nextUrl = body.url !== undefined ? body.url.trim() : existing.url;
@@ -232,6 +274,11 @@ async function bootstrap(): Promise<void> {
     const existing = queryOne<MonitorRow>('SELECT * FROM monitors WHERE id = ?', [id]);
     if (!existing) {
       res.status(404).json({ error: '监控节点不存在' });
+      return;
+    }
+
+    if (process.env.OPSPULSE_ENV === 'production' && isProtectedSeedMonitor(existing.url)) {
+      res.status(403).json({ error: '生产内置核心节点受保护，禁止删除' });
       return;
     }
 

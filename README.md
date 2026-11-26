@@ -49,5 +49,5 @@ cd frontend && pnpm install && pnpm dev
 ## 作者与许可
 
 - **作者**：曹杰 / caojie (`calmjade`) · calmjade@foxmail.com
-- **GitHub**：[https://github.com/calmjade](https://github.com/calmjade) ｜ **Gitee**：[https://gitee.com/jiejie12315](https://gitee.com/jiejie12315)
+- **GitHub**：[https://github.com/calmjade](https://github.com/calmjade)
 - **开源协议**：[MIT License](./LICENSE)

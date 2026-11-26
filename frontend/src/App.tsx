@@ -126,14 +126,6 @@ export function App() {
             >
               GitHub: calmjade
             </a>
-            <a
-              href="https://gitee.com/jiejie12315"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-cyan-300"
-            >
-              Gitee: jiejie12315
-            </a>
           </div>
         </footer>
       </div>
